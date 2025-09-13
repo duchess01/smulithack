@@ -11,6 +11,9 @@ const LegalChatPlatform = () => {
   const [confidentialityCheck, setConfidentialityCheck] = useState(true); // Fixed: default to true
   const [showEducationalTip, setShowEducationalTip] = useState(null);
   const [pendingRefinement, setPendingRefinement] = useState(null);
+  const [showPromptAnalysis, setShowPromptAnalysis] = useState(false);
+const [promptAnalysis, setPromptAnalysis] = useState(null);
+const [showPromptEducation, setShowPromptEducation] = useState(false);
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -20,6 +23,45 @@ const LegalChatPlatform = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  const analyzePrompt = (text) => {
+  const textLower = text.toLowerCase();
+  
+  // Hardcoded analysis for "How can I create a contract for my employee" scenario
+  if (textLower.includes('contract') && textLower.includes('employee')) {
+    return {
+      clarity: 65,
+      specificity: 35,
+      jurisdiction: 15,
+      context: 25,
+      suggestions: [
+        "Specify the type of employment contract (permanent, temporary, part-time)",
+        "Include Singapore jurisdiction and Employment Act requirements",
+        "Provide context about your business size and industry",
+        "Mention specific clauses you need help with (salary, benefits, termination)"
+      ],
+      improvements: [
+        "Instead of 'contract for employee', try 'employment contract under Singapore Employment Act'",
+        "Add business context: 'for my tech startup' or 'for my retail business'",
+        "Specify contract type: 'permanent employment contract' vs 'fixed-term contract'"
+      ],
+      score: 35
+    };
+  }
+
+  // Fallback for other prompts
+  const analysis = {
+    clarity: 50,
+    specificity: 45,
+    jurisdiction: 30,
+    context: 40,
+    suggestions: ["Be more specific about your legal question"],
+    improvements: ["Add more context and specify Singapore jurisdiction"],
+    score: 40
+  };
+
+  return analysis;
+};
 
   // Sensitive information patterns
   const sensitivePatterns = [
@@ -91,7 +133,7 @@ const LegalChatPlatform = () => {
     const refinements = {
       employment: {
         keywords: ['employment', 'work', 'job', 'salary', 'leave', 'termination', 'mom'],
-        refined: "I understand you're asking about employment matters in Singapore. Let me refine your question: Are you specifically asking about [employment rights/termination procedures/leave entitlements/salary disputes] under the Employment Act and MOM guidelines? Please confirm if this captures your query correctly."
+        refined: "I understand you're asking about employment matters in Singapore. Let me refine your question: Are you specifically asking about [employment rights/termination procedures/leave entitlements/salary disputes] under the Employment Act and MOM guidelines? Please specify what your requirements are in detail for better results. An example prompt would be 'How can I draft a legally sound employment contract that clearly defines job responsibilities, compensation, benefits, working hours, confidentiality, termination conditions, and compliance with labor laws?'"
       },
       property: {
         keywords: ['property', 'house', 'hdb', 'condo', 'buy', 'sell', 'lease', 'rent'],
@@ -99,7 +141,7 @@ const LegalChatPlatform = () => {
       },
       contract: {
         keywords: ['contract', 'agreement', 'sign', 'terms', 'breach', 'void'],
-        refined: "You're asking about contractual matters. To provide better guidance: Are you specifically interested in [contract formation/breach of contract/contract terms/dispute resolution] under Singapore contract law? Please confirm this refinement is accurate."
+        refined: "You're asking about contractual matters. To provide better guidance: Are you specifically interested in how to draft and employee contract for yout company under Singapore contract law? Please provide more information so that I can draft a prompt for you. An example of a good prompt would be 'How can I draft a legally sound employment contract that clearly defines job responsibilities, compensation, benefits, working hours, confidentiality, termination conditions, and compliance with labor laws?'"
       },
       company: {
         keywords: ['company', 'business', 'acra', 'director', 'shareholder', 'incorporation'],
@@ -216,74 +258,99 @@ const LegalChatPlatform = () => {
   };
 
   const handleSendMessage = () => {
-    if (!inputText.trim()) return;
+  if (!inputText.trim()) return;
 
-    // Check for sensitive information
-    const sensitiveWarnings = checkSensitiveInfo(inputText);
-    const legalWarnings = checkLegalCitations(inputText);
-    const allWarnings = [...sensitiveWarnings, ...legalWarnings];
-    
-    if (allWarnings.length > 0) {
-      setWarnings(allWarnings);
-    }
+  // Perform prompt analysis
+  const analysis = analyzePrompt(inputText);
+  
+  // Always show analysis for demo purposes when it's the contract/employee scenario
+  const isContractEmployeeScenario = inputText.toLowerCase().includes('contract') && inputText.toLowerCase().includes('employee');
+  
+if (isContractEmployeeScenario || analysis.score < 70) {
+  setPromptAnalysis(analysis);
+  setShowPromptAnalysis(true);
+  
+  // For demo: also show the education modal after a delay
+  if (isContractEmployeeScenario) {
+    setTimeout(() => {
+      setShowPromptEducation(true);
+    }, 8000); // Show education after 8 seconds
+  }
+}
 
-    // Get educational tip
-    const tip = getEducationalTip(inputText);
-    if (tip) {
-      setShowEducationalTip(tip);
-    }
+  // Check for sensitive information
+  const sensitiveWarnings = checkSensitiveInfo(inputText);
+  const legalWarnings = checkLegalCitations(inputText);
+  const allWarnings = [...sensitiveWarnings, ...legalWarnings];
+  
+  if (allWarnings.length > 0) {
+    setWarnings(allWarnings);
+  }
 
-    // Add user message
-    const userMessage = {
-      id: Date.now(),
-      text: inputText,
-      sender: 'user',
-      timestamp: new Date().toLocaleTimeString(),
-      warnings: allWarnings
-    };
+  // Get educational tip
+  const tip = getEducationalTip(inputText);
+  if (tip) {
+    setShowEducationalTip(tip);
+  }
 
-    setMessages(prev => [...prev, userMessage]);
-    
-    // Check if this is the first interaction or not a refinement confirmation
-    const isFirstInteraction = messages.length === 0;
-    const currentInput = inputText;
-    setInputText('');
-    setIsTyping(true);
-
-    if (isFirstInteraction && !pendingRefinement) {
-      // First interaction - provide refinement
-      setTimeout(() => {
-        const refinedPrompt = refinePrompt(currentInput);
-        const refinementMessage = {
-          id: Date.now() + 1,
-          text: refinedPrompt,
-          sender: 'ai',
-          timestamp: new Date().toLocaleTimeString(),
-          isRefinement: true,
-          originalPrompt: currentInput
-        };
-        setMessages(prev => [...prev, refinementMessage]);
-        setPendingRefinement(currentInput);
-        setIsTyping(false);
-      }, 1500);
-    } else {
-      // Regular response with risk assessment
-      setTimeout(() => {
-        const responseData = generateAIResponse(currentInput, !!pendingRefinement);
-        const aiResponse = {
-          id: Date.now() + 1,
-          text: responseData.text,
-          sender: 'ai',
-          timestamp: new Date().toLocaleTimeString(),
-          disclaimer: true,
-          riskAssessment: responseData.riskAssessment
-        };
-        setMessages(prev => [...prev, aiResponse]);
-        setPendingRefinement(null);
-        setIsTyping(false);
-      }, 1500);
-    }
+  // Add user message with analysis
+  const userMessage = {
+    id: Date.now(),
+    text: inputText,
+    sender: 'user',
+    timestamp: new Date().toLocaleTimeString(),
+    warnings: allWarnings,
+    promptAnalysis: analysis
   };
+
+  setMessages(prev => [...prev, userMessage]);
+  
+  // Check if this is the first interaction or not a refinement confirmation
+  const isFirstInteraction = messages.length === 0;
+  const currentInput = inputText;
+  setInputText('');
+  setIsTyping(true);
+
+  if (isFirstInteraction && !pendingRefinement) {
+    // First interaction - provide refinement
+    setTimeout(() => {
+      const refinedPrompt = refinePrompt(currentInput);
+      const refinementMessage = {
+        id: Date.now() + 1,
+        text: refinedPrompt,
+        sender: 'ai',
+        timestamp: new Date().toLocaleTimeString(),
+        isRefinement: true,
+        originalPrompt: currentInput
+      };
+      setMessages(prev => [...prev, refinementMessage]);
+      setPendingRefinement(currentInput);
+      setIsTyping(false);
+    }, 1500);
+  } else {
+    // Regular response with risk assessment
+    setTimeout(() => {
+      const responseData = generateAIResponse(currentInput, !!pendingRefinement);
+      const aiResponse = {
+        id: Date.now() + 1,
+        text: responseData.text,
+        sender: 'ai',
+        timestamp: new Date().toLocaleTimeString(),
+        disclaimer: true,
+        riskAssessment: responseData.riskAssessment
+      };
+      setMessages(prev => [...prev, aiResponse]);
+      setPendingRefinement(null);
+      setIsTyping(false);
+    }, 1500);
+  }
+};
+
+const applyImprovedPrompt = (improvedPrompt) => {
+  setInputText(improvedPrompt);
+  setShowPromptAnalysis(false);
+  setPromptAnalysis(null);
+};
 
   const handleRefinementResponse = (accepted) => {
     if (accepted) {
@@ -317,10 +384,122 @@ const LegalChatPlatform = () => {
     }
   };
 
+  const PromptAnalysisCard = ({ analysis, originalPrompt, onApplyImprovement, onClose }) => {
+  const getScoreColor = (score) => {
+    if (score >= 70) return 'text-green-600';
+    if (score >= 50) return 'text-amber-600';
+    return 'text-red-600';
+  };
+
+  const getScoreBg = (score) => {
+    if (score >= 70) return 'bg-green-50 border-green-200';
+    if (score >= 50) return 'bg-amber-50 border-amber-200';
+    return 'bg-red-50 border-red-200';
+  };
+
+  const generateImprovedPrompt = () => {
+    // Hardcoded improved prompt for the demo scenario
+    if (originalPrompt.toLowerCase().includes('contract') && originalPrompt.toLowerCase().includes('employee')) {
+      return "What are the essential clauses I need to include in a permanent employment contract under the Singapore Employment Act for a software developer role at my tech startup, including probation period, salary structure, and termination procedures?";
+    }
+    
+    // Fallback for other prompts
+    return originalPrompt + " in Singapore under relevant Singapore law";
+  };
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4 shadow-sm">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-semibold text-gray-800 flex items-center space-x-2">
+          <AlertCircle className="w-5 h-5 text-blue-600" />
+          <span>Prompt Analysis & Suggestions</span>
+        </h3>
+        <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Overall Score */}
+      <div className={`p-3 rounded-lg border mb-4 ${getScoreBg(analysis.score)}`}>
+        <div className="flex items-center justify-between">
+          <span className="font-medium text-gray-700">Prompt Quality Score</span>
+          <span className={`text-xl font-bold ${getScoreColor(analysis.score)}`}>
+            {analysis.score}/100
+          </span>
+        </div>
+        <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+          <div 
+            className={`h-2 rounded-full transition-all duration-300 ${
+              analysis.score >= 70 ? 'bg-green-500' : 
+              analysis.score >= 50 ? 'bg-amber-500' : 'bg-red-500'
+            }`}
+            style={{ width: `${analysis.score}%` }}
+          ></div>
+        </div>
+      </div>
+
+      {/* Detailed Breakdown */}
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        {[
+          { label: 'Clarity', score: analysis.clarity },
+          { label: 'Specificity', score: analysis.specificity },
+          { label: 'Jurisdiction', score: analysis.jurisdiction },
+          { label: 'Context', score: analysis.context }
+        ].map(({ label, score }) => (
+          <div key={label} className="bg-gray-50 p-2 rounded">
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-600">{label}</span>
+              <span className={`text-sm font-medium ${getScoreColor(score)}`}>{score}%</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-1 mt-1">
+              <div 
+                className={`h-1 rounded-full ${
+                  score >= 70 ? 'bg-green-400' : 
+                  score >= 50 ? 'bg-amber-400' : 'bg-red-400'
+                }`}
+                style={{ width: `${score}%` }}
+              ></div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Suggestions */}
+      {analysis.suggestions.length > 0 && (
+        <div className="mb-4">
+          <h4 className="font-medium text-gray-700 mb-2">Improvement Suggestions:</h4>
+          <div className="space-y-2">
+            {analysis.suggestions.map((suggestion, idx) => (
+              <div key={idx} className="flex items-start space-x-2">
+                <CheckCircle className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                <p className="text-sm text-gray-600">{suggestion}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Improved Prompt */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+        <h4 className="font-medium text-blue-800 mb-2">Suggested Improved Prompt:</h4>
+        <p className="text-sm text-blue-700 bg-white p-2 rounded border border-blue-100 mb-3">
+          "{generateImprovedPrompt()}"
+        </p>
+        <button
+          onClick={() => onApplyImprovement(generateImprovedPrompt())}
+          className="w-full bg-blue-600 text-white py-2 px-3 rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
+        >
+          Use This Improved Prompt
+        </button>
+      </div>
+    </div>
+  );
+};
+
   const OnboardingModal = () => (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg p-6 max-w-lg w-full mx-4">
-        <h2 className="text-2xl font-bold mb-4 text-gray-800">Welcome to Legal AI Assistant</h2>
+        <h2 className="text-2xl font-bold mb-4 text-gray-800">Welcome to LegalGoWhere!</h2>
         
         <div className="space-y-4 mb-6">
           <div className="flex items-start space-x-3">
@@ -363,6 +542,113 @@ const LegalChatPlatform = () => {
       </div>
     </div>
   );
+
+  const PromptEducationModal = ({ onClose }) => (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-bold text-gray-800 flex items-center space-x-2">
+          <BookOpen className="w-6 h-6 text-blue-600" />
+          <span>How to Write Better Legal Prompts</span>
+        </h2>
+        <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+
+      <div className="space-y-6">
+        {/* The 4 C's Framework */}
+        <div>
+          <h3 className="font-semibold text-gray-800 mb-3">The 4 C's of Legal Prompts</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-blue-50 p-3 rounded-lg">
+              <h4 className="font-medium text-blue-800 mb-1">1. Clarity</h4>
+              <p className="text-sm text-blue-700">Use specific question words (what, how, when, where, why)</p>
+            </div>
+            <div className="bg-green-50 p-3 rounded-lg">
+              <h4 className="font-medium text-green-800 mb-1">2. Context</h4>
+              <p className="text-sm text-green-700">Provide situation details without sensitive info</p>
+            </div>
+            <div className="bg-amber-50 p-3 rounded-lg">
+              <h4 className="font-medium text-amber-800 mb-1">3. Completeness</h4>
+              <p className="text-sm text-amber-700">Include relevant legal areas and timeframes</p>
+            </div>
+            <div className="bg-purple-50 p-3 rounded-lg">
+              <h4 className="font-medium text-purple-800 mb-1">4. Compliance</h4>
+              <p className="text-sm text-purple-700">Specify Singapore jurisdiction and relevant acts</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Examples */}
+        <div>
+          <h3 className="font-semibold text-gray-800 mb-3">Before & After Examples</h3>
+          <div className="space-y-4">
+            <div className="border border-gray-200 rounded-lg p-4">
+              <div className="mb-3">
+                <span className="inline-block bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full mb-2">❌ Poor</span>
+                <p className="text-sm text-gray-600">"Tell me about employment law"</p>
+              </div>
+              <div>
+                <span className="inline-block bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full mb-2">✅ Better</span>
+                <p className="text-sm text-gray-700">"What are the notice period requirements under Singapore's Employment Act for terminating a permanent employee who has worked for 2 years?"</p>
+              </div>
+            </div>
+
+            <div className="border border-gray-200 rounded-lg p-4">
+              <div className="mb-3">
+                <span className="inline-block bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full mb-2">❌ Poor</span>
+                <p className="text-sm text-gray-600">"Contract questions"</p>
+              </div>
+              <div>
+                <span className="inline-block bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full mb-2">✅ Better</span>
+                <p className="text-sm text-gray-700">"What constitutes a valid acceptance of a contract offer under Singapore Contract Law, and what happens if acceptance is communicated via email?"</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Tips */}
+        <div>
+          <h3 className="font-semibold text-gray-800 mb-3">Quick Tips</h3>
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <ul className="space-y-2 text-sm text-gray-700">
+              <li className="flex items-start space-x-2">
+                <span className="text-blue-600">•</span>
+                <span>Always specify "Singapore" or relevant Singapore authority</span>
+              </li>
+              <li className="flex items-start space-x-2">
+                <span className="text-blue-600">•</span>
+                <span>Mention specific acts (Employment Act, Companies Act, etc.) if known</span>
+              </li>
+              <li className="flex items-start space-x-2">
+                <span className="text-blue-600">•</span>
+                <span>Provide context about your role and requirements (employee, business owner, tenant, etc.)</span>
+              </li>
+              <li className="flex items-start space-x-2">
+                <span className="text-blue-600">•</span>
+                <span>Avoid sharing sensitive personal or client information</span>
+              </li>
+              <li className="flex items-start space-x-2">
+                <span className="text-blue-600">•</span>
+                <span>Ask one clear question at a time for best results</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-6 flex justify-end">
+        <button
+          onClick={onClose}
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          Got it, thanks!
+        </button>
+      </div>
+    </div>
+  </div>
+);
 
   const WarningBanner = ({ warning }) => (
     <div className={`flex items-start space-x-2 p-3 rounded-lg mb-2 ${
@@ -471,18 +757,44 @@ const LegalChatPlatform = () => {
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       {showOnboarding && <OnboardingModal />}
+      {showPromptAnalysis && promptAnalysis && (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <PromptAnalysisCard 
+        analysis={promptAnalysis}
+        originalPrompt={inputText || messages[messages.length - 1]?.text || ''}
+        onApplyImprovement={applyImprovedPrompt}
+        onClose={() => {
+          setShowPromptAnalysis(false);
+          setPromptAnalysis(null);
+        }}
+      />
+    </div>
+  </div>
+)}
+
+{showPromptEducation && (
+  <PromptEducationModal onClose={() => setShowPromptEducation(false)} />
+)}
       
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <Shield className="w-6 h-6 text-blue-600" />
-            <h1 className="text-xl font-semibold text-gray-800">Legal AI Assistant - Singapore</h1>
+            <h1 className="text-xl font-semibold text-gray-800">Legal GoWhere?</h1>
           </div>
           <div className="flex items-center space-x-2">
-            <span className="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded-full">Beta</span>
-            <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded-full">Not Legal Advice</span>
-          </div>
+  <button
+    onClick={() => setShowPromptEducation(true)}
+    className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full hover:bg-blue-200 transition-colors flex items-center space-x-1"
+  >
+    <BookOpen className="w-3 h-3" />
+    <span>Prompt Tips</span>
+  </button>
+  <span className="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded-full">Beta</span>
+  <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded-full">Not Legal Advice</span>
+</div>
         </div>
       </div>
 
@@ -533,11 +845,11 @@ const LegalChatPlatform = () => {
                 </button>
                 
                 <button 
-                  onClick={() => setInputText("What are the key elements of a valid contract in Singapore?")}
-                  className="text-left p-3 bg-white rounded-lg border border-gray-200 hover:border-blue-300 transition-colors"
+                onClick={() => setInputText("How can I create a contract for my employee")}
+                className="text-left p-3 bg-white rounded-lg border border-gray-200 hover:border-blue-300 transition-colors"
                 >
-                  <h3 className="font-medium text-sm text-gray-700 mb-1">Contract Law</h3>
-                  <p className="text-xs text-gray-500">Understanding agreements</p>
+                <h3 className="font-medium text-sm text-gray-700 mb-1">Employment Contract</h3>
+                <p className="text-xs text-gray-500">Try this demo prompt!</p>
                 </button>
               </div>
             </div>
