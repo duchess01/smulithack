@@ -1,0 +1,2 @@
+# smulithack
+lit hackathon
