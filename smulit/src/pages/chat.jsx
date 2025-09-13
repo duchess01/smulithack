@@ -377,65 +377,105 @@ const LegalChatPlatform = () => {
     };
   };
 
- const handleSendMessage = () => {
-    if (!inputText.trim()) return;
+const handleSendMessage = () => {
+  if (!inputText.trim()) return;
 
-    // Check for sensitive information FIRST - before sending
-    const sensitiveWarnings = checkSensitiveInfo(inputText);
+  // If this is an improved prompt, skip analysis and go straight to response
+  if (isImprovedPrompt) {
+    // Add user message without analysis
+    const userMessage = {
+      id: Date.now(),
+      text: inputText,
+      sender: 'user',
+      timestamp: new Date().toLocaleTimeString(),
+      warnings: [],
+      isImprovedPrompt: true
+    };
 
-    // If sensitive information is detected, show warning and prevent sending
-    if (sensitiveWarnings.length > 0) {
-      setWarnings(sensitiveWarnings);
-      return; // Stop execution here - don't send the message
-    }
+    setMessages(prev => [...prev, userMessage]);
+    const currentInput = inputText;
+    setInputText('');
+    setIsTyping(true);
+    setIsImprovedPrompt(false); // Reset the flag
 
-    // Clear any existing warnings since message is safe to send
-    setWarnings([]);
+    // Provide hardcoded response for the improved employment contract prompt
+    setTimeout(() => {
+      const improvedPromptResponse = {
+        id: Date.now() + 1,
+        text: "Based on your refined question about employment contracts under Singapore law, here's what you need to know:\n\n**Essential Clauses for Employment Contracts:**\n\n1. **Job Details & Probation**: Clearly define the role, reporting structure, and probation period (typically 3-6 months)\n\n2. **Compensation Structure**: Specify basic salary, overtime rates, bonuses, and CPF contributions as per MOM requirements\n\n3. **Working Arrangements**: Include working hours (max 44 hours/week), rest days, and flexible work provisions if applicable\n\n4. **Leave Entitlements**: Annual leave (minimum 7 days), sick leave (14 days), and other statutory leaves\n\n5. **Termination Procedures**: Notice periods based on service length, grounds for immediate dismissal, and severance arrangements\n\n6. **Confidentiality & IP**: Protect company information and clarify intellectual property ownership\n\n**Key Singapore Employment Act Requirements:**\n- Contracts must be in writing for foreign employees\n- Include MOM work pass conditions if applicable\n- Ensure compliance with salary protection scheme for employees earning below $4,500\n\n**Next Steps:**\n- Consider industry-specific clauses for tech roles\n- Review with an employment lawyer before implementation\n- Ensure alignment with your company's employee handbook\n\nRemember to customize these clauses based on your specific business needs and industry requirements.",
+        sender: 'ai',
+        timestamp: new Date().toLocaleTimeString(),
+        disclaimer: true,
+        riskAssessment: {
+          level: 'medium',
+          color: 'amber',
+          title: 'Medium Risk Area',
+          message: 'Employment contracts require professional review for proper implementation.',
+          actions: [
+            'Schedule consultation with an employment lawyer',
+            'Review all terms carefully before implementation',
+            'Verify compliance with Singapore Employment Act and MOM guidelines',
+            'Consider getting legal review before using with employees'
+          ]
+        }
+      };
+      
+      setMessages(prev => [...prev, improvedPromptResponse]);
+      setIsTyping(false);
+    }, 2000);
+    return;
+  }
 
-  // Perform prompt analysis
+  // Original prompt analysis logic for regular prompts
   const analysis = analyzePrompt(inputText);
   
   // Always show analysis for demo purposes when it's the contract/employee scenario
   const isContractEmployeeScenario = inputText.toLowerCase().includes('contract') && inputText.toLowerCase().includes('employee');
   
-if (isContractEmployeeScenario || analysis.score < 70) {
-  setPromptAnalysis(analysis);
-  setShowPromptAnalysis(true);
-  
-  // For demo: also show the education modal after a delay
-  if (isContractEmployeeScenario) {
-    setTimeout(() => {
-      setShowPromptEducation(true);
-    }, 8000); // Show education after 8 seconds
-  }
-}
-
-    // Check for legal citations (these don't prevent sending, just warn)
-    const legalWarnings = checkLegalCitations(inputText);
-
-    // Get educational tip
-    const tip = getEducationalTip(inputText);
-    if (tip) {
-      setShowEducationalTip(tip);
+  if (isContractEmployeeScenario || analysis.score < 70) {
+    setPromptAnalysis(analysis);
+    setShowPromptAnalysis(true);
+    
+    // For demo: also show the education modal after a delay
+    if (isContractEmployeeScenario) {
+      setTimeout(() => {
+        setShowPromptEducation(true);
+      }, 8000); // Show education after 8 seconds
     }
+  }
 
-    // Add user message with analysis (only legal warnings, not sensitive ones since we blocked those)
-    const userMessage = {
-      id: Date.now(),
-      text: inputText,
-      sender: "user",
-      timestamp: new Date().toLocaleTimeString(),
-      warnings: legalWarnings, // Only include legal warnings, not sensitive ones
-      promptAnalysis: analysis,
-    };
+  // Check for sensitive information
+  const sensitiveWarnings = checkSensitiveInfo(inputText);
+  const legalWarnings = checkLegalCitations(inputText);
+  const allWarnings = [...sensitiveWarnings, ...legalWarnings];
+  
+  if (allWarnings.length > 0) {
+    setWarnings(allWarnings);
+  }
 
-    setMessages((prev) => [...prev, userMessage]);
+  // Get educational tip
+  const tip = getEducationalTip(inputText);
+  if (tip) {
+    setShowEducationalTip(tip);
+  }
 
-    // Check if this is the first interaction or not a refinement confirmation
-    const isFirstInteraction = messages.length === 0;
-    const currentInput = inputText;
-    setInputText("");
-    setIsTyping(true);
+  // Add user message with analysis
+  const userMessage = {
+    id: Date.now(),
+    text: inputText,
+    sender: 'user',
+    timestamp: new Date().toLocaleTimeString(),
+    warnings: allWarnings,
+    promptAnalysis: analysis
+  };
+
+  setMessages(prev => [...prev, userMessage]);
+  
+  // Check if this is the first interaction or not a refinement confirmation
+  const isFirstInteraction = messages.length === 0;
+  const currentInput = inputText;
+  setInputText('');
+  setIsTyping(true);
 
   if (isFirstInteraction && !pendingRefinement) {
     // First interaction - provide refinement
@@ -476,6 +516,7 @@ const applyImprovedPrompt = (improvedPrompt) => {
   setInputText(improvedPrompt);
   setShowPromptAnalysis(false);
   setPromptAnalysis(null);
+  setIsImprovedPrompt(true); // Mark this as an improved prompt
 };
 
   const handleRefinementResponse = (accepted) => {
