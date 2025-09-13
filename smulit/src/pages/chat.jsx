@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import FileUpload from "./fileupload";
 import {
   AlertCircle,
   Shield,
@@ -32,6 +33,16 @@ const LegalChatPlatform = () => {
   const [showPromptEducation, setShowPromptEducation] = useState(false);
   const messagesEndRef = useRef(null);
   const [isImprovedPrompt, setIsImprovedPrompt] = useState(false);
+  const [uploadedFile, setUploadedFile] = useState(null);
+  //File
+
+  const renderMessageText = (text) => {
+    const replaced = text.replace(
+      /\[\[highlight\]\](.*?)\[\[\/highlight\]\]/g,
+      (_, content) => `<span style="background-color: yellow">${content}</span>`
+    );
+    return <span dangerouslySetInnerHTML={{ __html: replaced }} />;
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -383,7 +394,13 @@ const LegalChatPlatform = () => {
 
   const handleSendMessage = () => {
     if (!inputText.trim()) return;
-
+    const sensitiveWarnings = checkSensitiveInfo(inputText);
+    if (sensitiveWarnings.length > 0) {
+      // Do nothing if sensitive info is detected
+      console.warn("Sensitive information detected. Message not sent.");
+      setWarnings(sensitiveWarnings); // Optionally show warning to user
+      return; // Exit early
+    }
     // If this is an improved prompt, skip analysis and go straight to response
     if (isImprovedPrompt) {
       // Add user message without analysis
@@ -406,7 +423,37 @@ const LegalChatPlatform = () => {
       setTimeout(() => {
         const improvedPromptResponse = {
           id: Date.now() + 1,
-          text: "Based on your refined question about employment contracts under Singapore law, here's what you need to know:\n\n**Essential Clauses for Employment Contracts:**\n\n1. **Job Details & Probation**: Clearly define the role, reporting structure, and probation period (typically 3-6 months)\n\n2. **Compensation Structure**: Specify basic salary, overtime rates, bonuses, and CPF contributions as per MOM requirements\n\n3. **Working Arrangements**: Include working hours (max 44 hours/week), rest days, and flexible work provisions if applicable\n\n4. **Leave Entitlements**: Annual leave (minimum 7 days), sick leave (14 days), and other statutory leaves\n\n5. **Termination Procedures**: Notice periods based on service length, grounds for immediate dismissal, and severance arrangements\n\n6. **Confidentiality & IP**: Protect company information and clarify intellectual property ownership\n\n**Key Singapore Employment Act Requirements:**\n- Contracts must be in writing for foreign employees\n- Include MOM work pass conditions if applicable\n- Ensure compliance with salary protection scheme for employees earning below $4,500\n\n**Next Steps:**\n- Consider industry-specific clauses for tech roles\n- Review with an employment lawyer before implementation\n- Ensure alignment with your company's employee handbook\n\nRemember to customize these clauses based on your specific business needs and industry requirements.",
+          text: (
+            <div>
+              <p>
+                <strong>Essential Clauses for Employment Contracts:</strong>
+              </p>
+              <ul>
+                <li>
+                  1. Job Details & Probation: Clearly define the role, reporting
+                  structure, and probation period (typically 3-6 months)
+                </li>
+                <li>
+                  2. Compensation Structure: Specify basic salary, overtime
+                  rates, bonuses, and CPF contributions as per MOM requirements
+                </li>
+                <li style={{ backgroundColor: "yellow" }}>
+                  3. Working Arrangements: Include working hours (max 40
+                  hours/week), rest days, and flexible work provisions if
+                  applicable
+                </li>
+                <li>
+                  4. Leave Entitlements: Annual leave (minimum 7 days), sick
+                  leave (14 days), and other statutory leaves
+                </li>
+                <li>
+                  5. Termination Procedures: Notice periods based on service
+                  length, grounds for immediate dismissal, and severance
+                  arrangements
+                </li>
+              </ul>
+            </div>
+          ),
           sender: "ai",
           timestamp: new Date().toLocaleTimeString(),
           disclaimer: true,
@@ -452,7 +499,7 @@ const LegalChatPlatform = () => {
     }
 
     // Check for sensitive information
-    const sensitiveWarnings = checkSensitiveInfo(inputText);
+    //const sensitiveWarnings = checkSensitiveInfo(inputText);
     const legalWarnings = checkLegalCitations(inputText);
     const allWarnings = [...sensitiveWarnings, ...legalWarnings];
 
@@ -1205,7 +1252,6 @@ const LegalChatPlatform = () => {
                   ))}
                 </div>
               )}
-
               <div
                 className={`flex ${
                   message.sender === "user" ? "justify-end" : "justify-start"
